@@ -1,0 +1,24 @@
+---
+title: "CA1"
+author: "Florence Lourdes"
+date: "2023-09-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#install.packages("tidyverse")
+library(tidyverse)
+library(tidymodels)
+library(kableExtra)
+library(patchwork)
+data <- read_csv("C:\MAT434\data.csv")
+```
+
+```{r}
+data %>%
+  head()
+```
