@@ -5,11 +5,11 @@ author: "Florence Lourdes"
 output: html_document
 ---
 
-## Summary 
+## Summary
 
-The **International Labour Organization (ILO)** has many [data sets](http://www.ilo.org/global/statistics-and-databases/lang--en/index.htm) on working conditions. For example, one can look at how weekly working hours have been decreasing in many countries of the world, while monetary compensation has risen. In this report, *the reduction in weekly working hours* in European countries is analysed, and a comparison between 1996 and 2006 is made. All analysed countries have seen a decrease in weekly working hours since 1996 – some more than others.
+The **International Labour Organization (ILO)** has many [data sets](http://www.ilo.org/global/statistics-and-databases/lang--en/index.htm) on working conditions. For example, one can look at how weekly working hours have been decreasing in many countries of the world, while monetary compensation has risen. In this report, *the reduction in weekly working hours* in European countries is analysed, and a comparison between 1996 and 2006 is made. All analysed countries have seen a decrease in weekly working hours since 1996 -- some more than others.
 
-## Preparations 
+## Preparations
 
 ```{r loading_packages, message = FALSE}
 library(dplyr)
@@ -27,7 +27,7 @@ The herein used data can be found in the [statistics database of the ILO](http:/
 load(url("http://s3.amazonaws.com/assets.datacamp.com/production/course_5807/datasets/ilo_data.RData"))
 ```
 
-The loaded data contains `r ilo_data %>% nrow()` rows and `r ilo_data %>% ncol` columns. 
+The loaded data contains `r ilo_data %>% nrow()` rows and `r ilo_data %>% ncol` columns.
 
 ```{r generating_summary_statistics}
 # Some summary statistics
@@ -55,27 +55,9 @@ As can be seen from the above table, the average weekly working hours of Europea
 
 While the mean hourly compensation has increased to `r compensation %>% tail()` since 1980.
 
-### Preprocessing
-
-The data is now filtered so it only contains the years 1996 and 2006 – a good time range for comparison. 
-
-```{r}
-ilo_data <- ilo_data %>%
-  filter(year == "1996" | year == "2006")
-  
-# Reorder country factor levels
-ilo_data <- ilo_data %>%
-  # Arrange data frame first, so last is always 2006
-  arrange(year) %>%
-  # Use the fct_reorder function inside mutate to reorder countries by working hours in 2006
-  mutate(country = fct_reorder(country,
-                               working_hours,
-                               last))
-```  
-
 ### Results
 
-In the following, a plot that shows the reduction of weekly working hours from 1996 to 2006 is produced.
+In the following, a table that shows the reduction of weekly working hours from 1996 to 2006 is produced.
 
 ```{r}
 ilo_data %>%
@@ -85,4 +67,4 @@ ilo_data %>%
 x <- c(33.15975, 31.78460)
 ```
 
-The result is that there is a `r diff(x)` difference of working hour between 1996 and 2006 
+The result is that there is a `r diff(x)` difference of working hour between 1996 and 2006
