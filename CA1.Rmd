@@ -15,7 +15,7 @@ library(tidyverse)
 library(tidymodels)
 library(kableExtra)
 library(patchwork)
-data <- read_csv("C:\MAT434\data.csv")
+data <- read_csv("C:/MAT434/data.csv")
 ```
 
 ```{r}
