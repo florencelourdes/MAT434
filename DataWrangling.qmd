@@ -47,7 +47,7 @@ batted_balls %>%
 batted_balls %>%
   tail()
 ```
-##Inline R
+## Inline R
 There are a total of `r batted_balls %>% nrow()`observations and ` r batted_balls %>% ncol()` variables
 
 ## Filtering Rows (Records)
@@ -103,7 +103,7 @@ A common way to summarize categorical variables is to compute counts. We can do 
 batted_balls %>%
   count(pitch_name)
 ```
-##inline R
+## inline R
 There is a total of `r batted_balls %>% count(pitch_name)` pitches
 There is a total of `r batted_balls %>% count(pitcher_name)` pitchers
 
@@ -144,7 +144,7 @@ batted_balls %>%
   )
 ```
 
-##inline R
+## inline R
 The mean, median, and standard deviation of speed and angle are as follows 'r batted_balls %>%
   summarize(
     avg_launch_speed = mean(launch_speed, na.rm = TRUE),
