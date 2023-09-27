@@ -27,7 +27,7 @@ The herein used data can be found in the [statistics database of the ILO](http:/
 load(url("http://s3.amazonaws.com/assets.datacamp.com/production/course_5807/datasets/ilo_data.RData"))
 ```
 
-The loaded data contains `r ilo_data %>% nrow()` rows and `r ilo_data %>% ncol` columns.
+The loaded data contains `r ilo_data %>% nrow()` rows and `r ilo_data %>% ncol()` columns.
 
 ```{r generating_summary_statistics}
 # Some summary statistics
@@ -51,7 +51,7 @@ compensation <- summary %>%
   select (mean_hourly_compensation)
 ```
 
-As can be seen from the above table, the average weekly working hours of European countries have been descreasing to `r hours summary %>% tail()` since 1980.
+As can be seen from the above table, the average weekly working hours of European countries have been descreasing to `r hours %>% tail()` since 1980.
 
 While the mean hourly compensation has increased to `r compensation %>% tail()` since 1980.
 
@@ -60,11 +60,14 @@ While the mean hourly compensation has increased to `r compensation %>% tail()` 
 In the following, a table that shows the reduction of weekly working hours from 1996 to 2006 is produced.
 
 ```{r}
+ilo_data <- ilo_data %>%
+  filter(year == "1996" | year == "2006")
+
 ilo_data %>%
-  group_by(year) %>%
+   group_by(year) %>%
   summarize(mean_hourly_compensation = mean(hourly_compensation),
             mean_working_hours = mean(working_hours))
-x <- c(33.15975, 31.78460)
+x <- c(33.15975, 31.78460) 
 ```
 
 The result is that there is a `r diff(x)` difference of working hour between 1996 and 2006
