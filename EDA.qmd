@@ -1,0 +1,78 @@
+---
+title: "Data Visualization in R and Python"
+author: "You, Scientist"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+format: html
+theme: cerulean
+---
+
+```{r setup-r, message = FALSE}
+#install.packages("tidymodels")
+library(tidyverse)
+
+#Remove what is below if not using R
+library(tidymodels)
+
+batted_balls <- read_csv("https://raw.githubusercontent.com/agmath/agmath.github.io/master/data/classification/battedballs.csv")
+parks <- read_csv("https://raw.githubusercontent.com/agmath/agmath.github.io/master/data/classification/park_dimensions.csv")
+```
+
+
+## Clarifying a Goal with the MLB Data
+
+There are several objectives we might consider as we work with the MLB batted balls data set. One is *what features contribute to whether a batter ball results in a home run?*. For convenience, and so that we have some direction for inquiry, we'll use this question as motivation for today.
+
+## Exploratory Data Analyses (EDA)
+
+Throughout exploratory data analyses, we seek to learn more about our data. The information we learn will be used to inform our modeling choices. We can think of EDA and model training as the combination of us as analysts/scientists and our models studying for an exam. We want to learn patterns and relationships.
+
+### Training and Test Data
+
+Like studying for an exam we shouldn't know what the actual exam questions will be. For this reason, we'll split our data into `train`ing and `test` sets. Open a code cell below, using your language of choice, and split your data. 
+
+```{r}
+set.seed(434)
+data_splits <- initial_split(batted_balls)
+train <- training(data_splits)
+test <- testing(data_splits)
+
+train %>%
+  head()
+```
+```{r}
+train %>%
+  ggplot() +
+  geom_boxplot(aes(x = pitch_mph)) +
+  labs(x = "Pitch Speed (mph)",
+       y = "",
+       title = "Distribution of Pitch Speed in Miles per Hour")
+```
+
+We'll keep our `test` data hidden until we have a model (or set of models) that we plan to move forward with and then we'll use that data as one last check on model performance. For now, we'll work only with the training data.
+
+### Exploring Our Training Data
+
+```{r}
+batted_balls %>%
+ names()
+```
+
+```{r}
+#Plot of distribution of is_home_run
+train %>%
+  ggplot() +
+  geom_bar(aes(x = is_home_run)) +
+  labs(title = "Distribution of Home Runs",
+       y = "Count")
+```
+
+
+```{r}
+#Plot of Pitch Speed
+train %>%
+  ggplot() +
+  geom_boxplot(aes(x = pitch_mph, y = pitch_name, fill = pitch_name)) +
+  labs(title = "Distribution of Pitch Speeds",
+       x = "Speed (mph)")
+theme(legend.position = "None")
+```
