@@ -3,6 +3,8 @@ title: "CA1"
 author: "Florence Lourdes"
 date: "2023-09-27"
 output: html_document
+statement of purpose: "I am training a model to predict the price range of houses depending on some variables. 
+I am doing it for people who are looking to buy a house or sell their house. They can benefit by getting information about what they should be expecting when it comes to certain price range houses."
 ---
 
 ```{r setup, include=FALSE}
@@ -15,10 +17,84 @@ library(tidyverse)
 library(tidymodels)
 library(kableExtra)
 library(patchwork)
+library(ggplot2)
+install.packages('xgboost')
+require(xgboost)
+data(agaricus.train, package='xgboost')
+data(agaricus.test, package='xgboost')
+train <- agaricus.train
+test <- agaricus.test
 data <- read_csv("C:/MAT434/data.csv")
 ```
 
 ```{r}
 data %>%
   head()
+```
+
+# Set a seed for reproducibility
+```{r}
+set.seed(123)
+```
+
+# Split data into training and test sets
+```{r}
+split_data <- initial_split(data, prop = 0.8, strata = priceRange)  # Adjust ratio and strata as needed
+```
+
+# Extract the training and test sets
+```{r}
+train_data <- training(split_data)
+test_data <- testing(split_data)
+```
+
+# Exploratory Data Analysis (EDA)
+```{r}
+# Summary statistics
+summary(train_data)
+
+# Bar plots for categorical variables
+ggplot(train_data, aes(x = numOfBedrooms, y=priceRange)) + 
+  geom_bar(stat = "identity")
+
+# Scatterplots for relationships
+ggplot(train_data, aes(x=numOfBedrooms, y=priceRange)) + 
+    geom_point()
+
+# Correlation matrix
+cor(train_data)
+```
+
+# Training an XGBoost Model
+```{r}
+# Define model
+xgb_model <- xgboost(data = as.matrix(train_data[, -16]), 
+                     label = as.factor(train_data$priceRange),  # Convert to factor for classification
+                     nrounds = 100, 
+                     objective = "multi:softprob",  # For multiclass classification
+                     num_class = <number_of_classes>)  # Specify the number of classes
+```
+
+# Step 5: Evaluating the Model
+```{r}
+# Make predictions on the test set
+predictions <- predict(xgb_model, as.matrix(test_data[, -16]))
+
+# Calculate accuracy
+accuracy <- mean(predictions == as.factor(test_data$priceRange))
+
+# Create a confusion matrix
+confusion_matrix <- table(Actual = test_data$priceRange, Predicted = predictions)
+
+# Calculate precision, recall, and F1-score for the "High" class
+precision <- confusion_matrix["High", "High"] / sum(confusion_matrix[, "High"])
+recall <- confusion_matrix["High", "High"] / sum(confusion_matrix["High", ])
+f1_score <- 2 * (precision * recall) / (precision + recall)
+
+# Print evaluation metrics
+cat("Accuracy:", accuracy, "\n")
+cat("Confusion Matrix:\n", confusion_matrix, "\n")
+cat("Precision (High Class):", precision, "\n")
+cat("Recall (High Class):", recall, "\n")
+cat("F1-Score (High Class):", f1_score, "\n")
 ```
