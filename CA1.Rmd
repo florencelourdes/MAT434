@@ -75,7 +75,7 @@ xgb_model <- xgboost(data = as.matrix(train_data[, -16]),
                      num_class = <number_of_classes>)  # Specify the number of classes
 ```
 
-# Step 5: Evaluating the Model
+# Evaluating the Model
 ```{r}
 # Make predictions on the test set
 predictions <- predict(xgb_model, as.matrix(test_data[, -16]))
