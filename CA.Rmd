@@ -13,6 +13,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 #install.packages("tidyverse")
+install.packages("corrr")
+library(corrr)
 library(tidyverse)
 library(tidymodels)
 library(kableExtra)
@@ -62,7 +64,9 @@ ggplot(train_data, aes(x=numOfBedrooms, y=priceRange)) +
     geom_point()
 
 # Correlation matrix
-cor(train_data)
+data_cor <- train_data %>% 
+  select(numOfBedrooms, lotSizeSqFt, priceRange) %>% 
+  correlate()
 ```
 
 # Training an XGBoost Model
