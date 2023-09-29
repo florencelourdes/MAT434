@@ -365,7 +365,7 @@ data_for_model <- data %>%
 
 #training and test sets
 set.seed(123)
-data_splits <- initial_split(data)
+data_splits <- initial_split(data_for_model)
 train <- training(data_splits)
 test <- testing(data_splits)
 
@@ -403,10 +403,10 @@ log_reg_fit <- log_reg_wf %>%
   fit(train)
 
 #Assess model on test data
-my_metrics <- metric_set(accuracy, precision, recall)
+#my_metrics <- metric_set(accuracy, precision, recall)
 log_reg_fit %>%
   augment(test) %>%
-  my_metrics(response, .pred)
+  my_metrics(transported, .pred_class)
 
 #Use model to predict for new data
 log_reg_fit %>%
