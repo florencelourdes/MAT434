@@ -1,0 +1,112 @@
+---
+title: "Spaceship Titanic R"
+format: html
+editor: visual
+---
+
+```{r message = FALSE}
+library(tidyverse)
+library(tidymodels)
+library(kableExtra)
+
+data <- read_csv("https://raw.githubusercontent.com/agmath/agmath.github.io/master/data/classification/spaceship_titanic.csv")
+```
+
+## Data Splitting
+
+We start by creating our training and test sets and then splitting our training data into cross-validation folds.
+
+```{r}
+data_for_model <- data %>%
+  mutate(Transported = as.factor(ifelse(Transported == TRUE, "yes", "no")))
+
+#training and test sets
+set.seed(123)
+data_splits <- initial_split(data_for_model)
+train <- training(data_splits)
+test <- testing(data_splits)
+
+#build cross-validation folds
+set.seed(456)
+train_folds <- vfold_cv(train, v = 10)
+```
+
+## Exploratory Data Analysis
+
+...Omitted for brevity...
+
+## Basic Model Construction
+
+Below we'll construct basic "off-the-shelf" logistic regression model and support vector classifier. We'll look at optimizing our models later in this notebook.
+
+#### Basic Logistic Regression Model
+
+We create and assess a basic logistic regression model below.
+
+```{r}
+#Create a model specification
+log_reg_spec <- logistic_reg() %>%
+  set_engine("glm") %>%
+  set_mode("classification")
+
+#Create a recipe
+log_reg_rec <- recipe(Transported ~ ., data = train) %>%
+  step_rm(PassengerId, Cabin, Name) %>%
+  step_impute_median(all_numeric_predictors()) %>%
+  step_impute_mode(all_nominal_predictors()) %>%
+  step_dummy(all_nominal_predictors()) #add recipe steps as needed
+
+#Create a workflow
+log_reg_wf <- workflow() %>%
+  add_model(log_reg_spec) %>%
+  add_recipe(log_reg_rec)
+
+#Run cross-validation to obtain cross-validation performance estimate
+log_reg_cv_results <- log_reg_wf %>%
+  fit_resamples(train_folds)
+
+#Collect cross-validation results
+log_reg_cv_results %>%
+  collect_metrics()
+```
+
+#### Basic Support Vector Classifier
+
+Similarly, we create and assess a basic support vector classifier next.
+
+```{r}
+#Create a model specification
+svm_spec <- svm_linear() %>%
+  set_engine("kernlab") %>%
+  set_mode("classification")
+
+#Create a recipe
+svm_rec <- recipe(Transported ~ ., data = train) %>%
+  step_rm(PassengerId, Cabin, Name, HomePlanet, Destination, CryoSleep, VIP) %>%
+  step_impute_median(all_numeric_predictors()) %>%
+  step_normalize(all_numeric_predictors())
+
+#Create a workflow
+svm_wf <- workflow() %>%
+  add_model(svm_spec) %>%
+  add_recipe(svm_rec)
+
+#Run cross-validation to obtain cross-validation performance estimate
+svm_cv_results <- svm_wf %>%
+  fit_resamples(train_folds)
+
+#Collect cross-validation results
+svm_cv_results %>%
+  collect_metrics()
+```
+
+Notice that we've simply constructed our modeling workflows and assessed them using cross-validation. We are no longer *fitting* our models to the training data, nor are we opening the test data to assess these models. We don't want to "open" the test data until we've decided on what our best model is. We still have work to do before we can decide on what model is best. That being said, what model is best *so far*?
+
+## Tuning Models
+
+It is rarely the case that the "off-the-shelf" version of a model gives the best performance. We've discussed hyperparameters for the logistic regression model and for the support vector classifier. Let's see how our performance changes when we *tune* some of those hyperparameters.
+
+
+
+
+
