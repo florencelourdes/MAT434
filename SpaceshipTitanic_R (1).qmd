@@ -105,8 +105,3 @@ Notice that we've simply constructed our modeling workflows and assessed them us
 ## Tuning Models
 
 It is rarely the case that the "off-the-shelf" version of a model gives the best performance. We've discussed hyperparameters for the logistic regression model and for the support vector classifier. Let's see how our performance changes when we *tune* some of those hyperparameters.
-
-
-
-
-

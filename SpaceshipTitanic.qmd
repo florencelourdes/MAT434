@@ -361,7 +361,8 @@ knitr:
 
 ```{r}
 data_for_model <- data %>%
-  mutate(transported = ifelse(transported == TRUE, "yes", "no"))
+  mutate(transported = ifelse(transported == TRUE, "yes", "no")) %>%
+  mutate(transported = as.factor(transported))
 
 #training and test sets
 set.seed(123)
@@ -406,9 +407,5 @@ log_reg_fit <- log_reg_wf %>%
 #my_metrics <- metric_set(accuracy, precision, recall)
 log_reg_fit %>%
   augment(test) %>%
-  my_metrics(transported, .pred_class)
-
-#Use model to predict for new data
-log_reg_fit %>%
-  augment(new_data)
+  accuracy(transported, .pred_class)
 ```
