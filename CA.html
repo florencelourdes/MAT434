@@ -13,7 +13,7 @@
 
 <meta name="date" content="2023-09-27" />
 
-<title>CA1</title>
+<title>Competition Assignment</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -350,7 +350,7 @@ display: none;
 
 
 
-<h1 class="title toc-ignore">CA1</h1>
+<h1 class="title toc-ignore">Competition Assignment</h1>
 <h4 class="author">Florence Lourdes</h4>
 <h4 class="date">2023-09-27</h4>
 
@@ -386,7 +386,7 @@ library(tidyverse)</code></pre>
 ## ✖ dplyr::lag()      masks stats::lag()
 ## ✖ yardstick::spec() masks readr::spec()
 ## ✖ recipes::step()   masks stats::step()
-## • Use suppressPackageStartupMessages() to eliminate package startup messages</code></pre>
+## • Search for functions across packages at https://www.tidymodels.org/find/</code></pre>
 <pre class="r"><code>library(kableExtra)</code></pre>
 <pre><code>## 
 ## Attaching package: &#39;kableExtra&#39;
@@ -470,7 +470,9 @@ train_folds &lt;- vfold_cv(train_data, v = 10)</code></pre>
 <div id="exploratory-data-analysis-eda" class="section level1">
 <h1>Exploratory Data Analysis (EDA)</h1>
 <p>EDA is an analysis approach that identifies general patterns in the
-data</p>
+data. These patterns include outliers and features of the data that
+might be unexpected. EDA is an important first step in any data
+analysis.</p>
 <pre class="r"><code># Summary statistics
 summary(train_data)</code></pre>
 <pre><code>##        id           city           description          homeType        
@@ -558,21 +560,17 @@ There were issues with some computations   A: x1   B: x1
 
 There were issues with some computations   A: x2   B: x1
 
-There were issues with some computations   A: x2   B: x2
-
 There were issues with some computations   A: x3   B: x2
 
-There were issues with some computations   A: x4   B: x3
+There were issues with some computations   A: x3   B: x3
 
-There were issues with some computations   A: x4   B: x4
+There were issues with some computations   A: x4   B: x3
 
 There were issues with some computations   A: x5   B: x4
 
 There were issues with some computations   A: x5   B: x5
 
 There were issues with some computations   A: x6   B: x5
-
-There were issues with some computations   A: x6   B: x6
 
 There were issues with some computations   A: x7   B: x6
 
@@ -584,11 +582,7 @@ There were issues with some computations   A: x8   B: x8
 
 There were issues with some computations   A: x9   B: x8
 
-There were issues with some computations   A: x9   B: x9
-
 There were issues with some computations   A: x10   B: x9
-
-There were issues with some computations   A: x10   B: x10
 
 There were issues with some computations   A: x10   B: x10</code></pre>
 <pre><code>## Warning: All models failed. Run `show_notes(.Last.tune.result)` for more
