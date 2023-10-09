@@ -62,7 +62,7 @@ train_folds <- vfold_cv(train_data, v = 10)
 ```
 
 # Exploratory Data Analysis (EDA)
-EDA is an analysis approach that identifies general patterns in the data
+EDA is an analysis approach that identifies general patterns in the data. These patterns include outliers and features of the data that might be unexpected. EDA is an important first step in any data analysis.
 ```{r}
 # Summary statistics
 summary(train_data)
