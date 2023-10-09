@@ -13,14 +13,14 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 #install.packages("tidyverse")
-install.packages("corrr")
+#install.packages("corrr")
 library(corrr)
 library(tidyverse)
 library(tidymodels)
 library(kableExtra)
 library(patchwork)
 library(ggplot2)
-install.packages('xgboost')
+#install.packages('xgboost')
 require(xgboost)
 data(agaricus.train, package='xgboost')
 data(agaricus.test, package='xgboost')
@@ -106,19 +106,19 @@ log_reg_cv_results <- log_reg_wf %>%
   fit_resamples(train_folds)
 
 #Collect cross-validation results
-log_reg_cv_results %>%
-  collect_metrics()
+#log_reg_cv_results %>%
+  #collect_metrics()
 
 #Fit model to training data
-log_reg_fit <- log_reg_wf %>%
-  fit(train_data)
+#log_reg_fit <- log_reg_wf %>%
+  #fit(train_data)
 
 #Assess model on test data
-log_reg_wf %>%
-  augment(test) %>%
-  my_metrics(response, .pred)
+#log_reg_wf %>%
+  #augment(test) %>%
+  #my_metrics(response, .pred)
 
 #Use model to predict for new data
-log_reg_fit %>%
-  augment(new_data)
+#log_reg_fit %>%
+  #augment(new_data)
 ```
