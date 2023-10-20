@@ -1,0 +1,143 @@
+---
+title: "Hospital Length of Stay Models"
+author: "You, Scientist"
+format: html
+---
+
+```{r setup}
+library(tidyverse)
+library(tidymodels)
+
+data <- read_csv("https://raw.githubusercontent.com/agmath/agmath.github.io/master/data/classification/hospital_stays_smaller.csv")
+
+#Create clean versions of column names by removing spaces and converting to lowercase
+names(data) <- janitor::make_clean_names(names(data))
+```
+
+## Statement of Purpose
+
+(Omitted for now -- try on your own for practice...)
+
+## Introduction
+
+(Omitted for now -- usually done at the end of a project...)
+
+## Exploratory Data Analysis
+
+(Partially Omitted for now -- try on your own for practice...)
+
+Major steps...
+
++ Explore data set (No summary statistics here...try to avoid data leakage)
+
+  + Print out *head*
+  + Are there missing values?
+  + Are any classes in your response variable rare?
+
+The first few rows of data appear below. 
+
+```{r}
+data %>%
+  head()
+```
+
+Let's check the columns to see if there are missing values anywhere.
+
+```{r}
+data %>%
+  summarize_all(~ sum(is.na(.))) #the dot (.) represents all columns here
+```
+
+Notice that there are missing values in the `bed_grade` and `city_code_patient` columns. There are very few missing values relative to the overall size of the data set. Now let's look at the distribution of the `stay` variable to see if there are any very rare classes.
+
+```{r}
+data %>%
+  count(stay) %>%
+  mutate(prop = 100*(n / sum(n)))
+```
+
+There are certainly some categories here which are more rare than others. It looks like 11 - 40 day stays are most common. This encompasses three categories (11-20, 21-30, and 31-40 days). There are 6 categories in total here. Random guessing of classifications would lead us to an expected accuracy of less than 17%, but a naive classifier that just predicted 21 - 30 days for everyone would have nearly 30% accuracy. We'll see if we can build a classifier that does better than this.
+
++ **Do Today!** Split into training and test sets (be sure to set a seed)
+
+We'll split the data into training and test sets below. Since we have such a large data set to begin with (100,000 observations), we can afford to put more than 75% of these observations into training.
+
+```{r}
+set.seed(123)
+data_splits <- initial_split(data, prop = 0.9)
+train <- training(data_splits)
+test <- testing(data_splits)
+```
+
++ Conduct EDA on *training* data only
+  
+  + Understand the distributions of your response variable and available predictors
+  + Uncover associations between your response and the available predictors
+  + Potentially probe for relationships between predictors -- this is particularly important if you want to interpret your model -- associated predictors cause problems for model interpretation when included in the same model
+
++ Summarize your findings and how they'll impact your model construction phase
+  
+## Model Construction
+
+Goal(s) for October 13, 2023
+
+  + Build and assess an "off the shelf" *nearest neighbors classifier*
+  + Tune a *nearest neighbors classifier* to find the optimal number of voting neighbors -- tune other hyperparameters if you like as well
+  + Add your model's predictions as columns to your training set (being able to add predictions to a data frame will be useful for CA3)
+  
+
+### Nearest Neighbors Classifier
+
+**Note:** Nearest neighbor algorithms scale poorly with additional training observations. This is because distances between any new observations and all training observations must be computed in order for a prediction to be made. Nearest neighbor algorithms can make find classifiers (or regressors), but are not typically viable with large datasets. We can, however, utilize parallel processing with this algorithm.
+
+As mentioned, nearest neighbor classifiers are slow to fit and more training data means slower "fitting" times. To avoid exceedingly lengthy fit times, we'll take a small sample from our training data to work with -- just 10,000 observations -- and then create our cross-validation folds using that small sample.
+
+```{r}
+set.seed(456)
+small_train <- train %>%
+  slice_sample(n = 1e4)
+
+set.seed(789)
+small_folds <- vfold_cv(small_train, v = 10)
+```
+
+Now we're ready to build our nearest neighbor classifier. We'll start with an "off the shelf" model that accepts the default parameters. Additionally, we'll only use the `admission_deposit`, `visitors_with_patient`, and `available_extra_rooms_in_hospital` variables as predictors here since those are numerical predictors. The remaining features are probably best interpreted as categorical since there are very few observed levels of those variables.
+
+```{r}
+knn_clf_spec <- nearest_neighbor() %>%
+  set_engine("kknn") %>%
+  set_mode("classification")
+
+knn_rec <- recipe(stay ~ admission_deposit + visitors_with_patient + available_extra_rooms_in_hospital, data = train) %>%
+  step_impute_median(all_numeric_predictors()) %>%
+  step_normalize(all_numeric_predictors())
+
+knn_wf <- workflow() %>%
+  add_model(knn_clf_spec) %>%
+  add_recipe(knn_rec)
+
+knn_results <- knn_wf %>%
+  fit_resamples(small_folds)
+knn_results %>%
+  collect_metrics()
+```
+
+Let's see the types of predictions this model makes. Let's `fit()` this nearest neighbors model and then use it to add a column of predictions to our small training dataset.
+
+```{r}
+knn_fit <- knn_wf %>%
+  fit(small_train)
+
+knn_fit %>%
+  augment(small_train) %>%
+  count(stay, .pred_class) %>%
+  pivot_wider(names_from = .pred_class, values_from = n)
+```
+
+We aren't simply making the naive prediction, and it looks like the nearest neighbor classifier is making the expected mistakes. That is, when the classifier makes an erroneous prediction, it is most often to a neighboring class. Discussing neighboring classes here is meaningful since the `stay` variable is an *ordered* categorical variable.
+
+## Summary
+
+We've built and fit our nearest neighbor classifier and used it to make predictions on the small version of our training set. I'll leave it to you to use a grid search to find the optimal number of neighbors here. You'll want to use the small training set when you do this too -- otherwise your grid search and cross-validation will take a very, very long time to run.
+
+We'll continue here from next time, where we'll build a decision tree classifier. At that class meeting, we'll try tuning hyperparameters for that class of model as well as our nearest neighbor classifier.
