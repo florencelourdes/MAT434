@@ -1,26 +1,33 @@
 ---
 title: "Hospital Length of Stay Models"
-author: "You, Scientist"
+author: "Florence, Scientist"
 format: html
 ---
 
 ```{r setup}
+#install.packages("kknn")
+#install.packages("rpart")
+#install.packages("rpart.plot")
+library(rpart.plot)
+library(rpart)
 library(tidyverse)
 library(tidymodels)
 
-data <- read_csv("https://raw.githubusercontent.com/agmath/agmath.github.io/master/data/classification/hospital_stays_smaller.csv")
+hospital_data <- read_csv("https://raw.githubusercontent.com/agmath/agmath.github.io/master/data/classification/hospital_stays_smaller.csv")
 
 #Create clean versions of column names by removing spaces and converting to lowercase
-names(data) <- janitor::make_clean_names(names(data))
+names(hospital_data) <- janitor::make_clean_names(names(hospital_data))
 ```
 
 ## Statement of Purpose
 
-(Omitted for now -- try on your own for practice...)
+In the modern healthcare landscape, optimizing hospital operations and ensuring the efficient allocation of resources are paramount. One critical aspect of this process is predicting the length of a patient's stay in the hospital. This project aims to develop a robust prediction model for hospital length of stay, using data science and machine learning techniques, with a primary focus on utilizing the R programming language.
+
+The problem we aim to address is the unpredictability of hospital length of stay, which can lead to challenges in resource allocation and patient management. By accurately predicting the length of stay, we can help hospitals optimize their resources, reduce costs, and enhance the overall patient experience.
 
 ## Introduction
 
-(Omitted for now -- usually done at the end of a project...)
+Hospitals worldwide grapple with the challenge of managing their resources efficiently while ensuring high-quality patient care. The unpredictability of how long a patient will stay in the hospital adds a layer of complexity to this task. Hospitals need a solution that enables them to predict the length of a patient's stay accurately to allocate resources effectively and improve overall patient satisfaction.
 
 ## Exploratory Data Analysis
 
@@ -37,23 +44,69 @@ Major steps...
 The first few rows of data appear below. 
 
 ```{r}
-data %>%
+hospital_data %>%
   head()
 ```
 
 Let's check the columns to see if there are missing values anywhere.
 
 ```{r}
-data %>%
+hospital_data %>%
   summarize_all(~ sum(is.na(.))) #the dot (.) represents all columns here
 ```
 
 Notice that there are missing values in the `bed_grade` and `city_code_patient` columns. There are very few missing values relative to the overall size of the data set. Now let's look at the distribution of the `stay` variable to see if there are any very rare classes.
 
 ```{r}
-data %>%
+hospital_data %>%
   count(stay) %>%
   mutate(prop = 100*(n / sum(n)))
+```
+
+# Data Visualization
+```{r}
+# Create a bar plot for Age
+ggplot(hospital_data, aes(x = age)) +
+  geom_bar() +
+  labs(title = "Distribution of Age",
+       x = "Age",
+       y = "Count")
+
+# Create a bar plot for Age vs. Length Of Stay
+ggplot(hospital_data, aes(x = age, fill = stay)) +
+  geom_bar() +
+  labs(title = "Age vs. Length of Stay",
+       x = "Age",
+       y = "Count",
+       fill = "Length of Stay") +
+  theme(legend.title = element_blank())  # Remove legend title
+
+# Create a bar plot for Department vs. Length Of Stay
+ggplot(hospital_data, aes(x = department, fill = stay)) +
+  geom_bar() +
+  labs(title = "Department vs. Length of Stay",
+       x = "Department",
+       y = "Count",
+       fill = "Length of Stay") +
+  theme(legend.title = element_blank())  # Remove legend title
+
+# Create a bar plot for Severity vs. Length Of Stay
+ggplot(hospital_data, aes(x = severity_of_illness, fill = stay)) +
+  geom_bar() +
+  labs(title = "Severity of Illness vs. Length of Stay",
+       x = "Severity",
+       y = "Count",
+       fill = "Length of Stay") +
+  theme(legend.title = element_blank())  # Remove legend title
+
+# Create a bar plot for Type of Admission vs. Length Of Stay
+ggplot(hospital_data, aes(x = type_of_admission, fill = stay)) +
+  geom_bar() +
+  labs(title = "Type of Admission vs. Length of Stay",
+       x = "Admission",
+       y = "Count",
+       fill = "Length of Stay") +
+  theme(legend.title = element_blank())  # Remove legend title
 ```
 
 There are certainly some categories here which are more rare than others. It looks like 11 - 40 day stays are most common. This encompasses three categories (11-20, 21-30, and 31-40 days). There are 6 categories in total here. Random guessing of classifications would lead us to an expected accuracy of less than 17%, but a naive classifier that just predicted 21 - 30 days for everyone would have nearly 30% accuracy. We'll see if we can build a classifier that does better than this.
@@ -64,7 +117,7 @@ We'll split the data into training and test sets below. Since we have such a lar
 
 ```{r}
 set.seed(123)
-data_splits <- initial_split(data, prop = 0.9)
+data_splits <- initial_split(hospital_data, prop = 0.9)
 train <- training(data_splits)
 test <- testing(data_splits)
 ```
@@ -74,8 +127,54 @@ test <- testing(data_splits)
   + Understand the distributions of your response variable and available predictors
   + Uncover associations between your response and the available predictors
   + Potentially probe for relationships between predictors -- this is particularly important if you want to interpret your model -- associated predictors cause problems for model interpretation when included in the same model
+  + Summarize your findings and how they'll impact your model construction phase
 
-+ Summarize your findings and how they'll impact your model construction phase
+```{r} 
+# Create a bar plot for Age
+ggplot(hospital_data, aes(x = age)) +
+  geom_bar() +
+  labs(title = "Distribution of Age",
+       x = "Age",
+       y = "Count")
+
+# Create a bar plot for Age vs. Length Of Stay
+ggplot(train, aes(x = age, fill = stay)) +
+  geom_bar() +
+  labs(title = "Age vs. Length of Stay",
+       x = "Age",
+       y = "Count",
+       fill = "Length of Stay") +
+  theme(legend.title = element_blank())  # Remove legend title
+
+# Create a bar plot for Department vs. Length Of Stay
+ggplot(train, aes(x = department, fill = stay)) +
+  geom_bar() +
+  labs(title = "Department vs. Length of Stay",
+       x = "Department",
+       y = "Count",
+       fill = "Length of Stay") +
+  theme(legend.title = element_blank())  # Remove legend title
+
+# Create a bar plot for Severity vs. Length Of Stay
+ggplot(train, aes(x = severity_of_illness, fill = stay)) +
+  geom_bar() +
+  labs(title = "Severity of Illness vs. Length of Stay",
+       x = "Severity",
+       y = "Count",
+       fill = "Length of Stay") +
+  theme(legend.title = element_blank())  # Remove legend title
+
+# Create a bar plot for Type of Admission vs. Length Of Stay
+ggplot(train, aes(x = type_of_admission, fill = stay)) +
+  geom_bar() +
+  labs(title = "Type of Admission vs. Length of Stay",
+       x = "Admission",
+       y = "Count",
+       fill = "Length of Stay") +
+  theme(legend.title = element_blank())  # Remove legend title
+```
+The summary of the EDA on training data set is that middle aged people (31-40 and 41-50) have the longest length of stay. It also shows that gynecology department has the most patient and the longest stay. The most common severity for the longest stay is moderate, The trauma admission has the longest stay.
+
   
 ## Model Construction
 
@@ -141,3 +240,50 @@ We aren't simply making the naive prediction, and it looks like the nearest neig
 We've built and fit our nearest neighbor classifier and used it to make predictions on the small version of our training set. I'll leave it to you to use a grid search to find the optimal number of neighbors here. You'll want to use the small training set when you do this too -- otherwise your grid search and cross-validation will take a very, very long time to run.
 
 We'll continue here from next time, where we'll build a decision tree classifier. At that class meeting, we'll try tuning hyperparameters for that class of model as well as our nearest neighbor classifier.
+
+# Decision Tree Classifier
+```{r}
+
+# Create the decision tree model
+
+## workflow
+dt_spec <- decision_tree() %>%
+  set_mode("classification") %>%
+  set_engine("rpart")
+
+dt_rec <- recipe(stay ~ age + department + severity_of_illness + type_of_admission, data = train) %>%
+  step_impute_median(all_numeric_predictors()) %>%
+  step_unknown(all_nominal_predictors()) %>%
+  step_dummy(all_nominal_predictors())
+
+dt_wf <- workflow() %>%
+  add_model(dt_spec) %>%
+  add_recipe(dt_rec)
+
+## cross validation
+dt_cv_results <- dt_wf %>%
+  fit_resamples(train)
+
+## fit
+trained_model <- fit(dt_wf, data = train)
+
+## prediction
+predictions <- predict(trained_model, new_data = test)
+
+## hyperparameter grids
+grid_depth <- tibble(
+  "tree_depth" = c(2, 3, 4, 5, 8, 10, 12, 15, 20)
+  )
+dt_tune_results <- dt_wf %>%
+  tune_grid(grid = grid_depth, resamples = train)
+
+## result
+dt_tune_results %>%
+  collect_metrics() %>%
+  filter(.metric == "accuracy") %>%
+  select(tree_depth, mean, std_err) %>%
+  arrange(-mean)
+```
+
+
+
