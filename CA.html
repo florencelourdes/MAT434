@@ -610,7 +610,7 @@ library(tidyverse)</code></pre>
 ## ✖ dplyr::lag()      masks stats::lag()
 ## ✖ yardstick::spec() masks readr::spec()
 ## ✖ recipes::step()   masks stats::step()
-## • Use tidymodels_prefer() to resolve common conflicts.</code></pre>
+## • Search for functions across packages at https://www.tidymodels.org/find/</code></pre>
 <pre class="r"><code>library(kableExtra)</code></pre>
 <pre><code>## 
 ## Attaching package: &#39;kableExtra&#39;
@@ -784,19 +784,17 @@ There were issues with some computations   A: x1   B: x1
 
 There were issues with some computations   A: x2   B: x1
 
-There were issues with some computations   A: x2   B: x2
-
 There were issues with some computations   A: x3   B: x2
-
-There were issues with some computations   A: x3   B: x3
 
 There were issues with some computations   A: x4   B: x3
 
+There were issues with some computations   A: x4   B: x4
+
 There were issues with some computations   A: x5   B: x4
 
-There were issues with some computations   A: x6   B: x5
+There were issues with some computations   A: x5   B: x5
 
-There were issues with some computations   A: x6   B: x6
+There were issues with some computations   A: x6   B: x5
 
 There were issues with some computations   A: x7   B: x6
 
@@ -809,6 +807,8 @@ There were issues with some computations   A: x9   B: x8
 There were issues with some computations   A: x9   B: x9
 
 There were issues with some computations   A: x10   B: x9
+
+There were issues with some computations   A: x10   B: x10
 
 There were issues with some computations   A: x10   B: x10</code></pre>
 <pre><code>## Warning: All models failed. Run `show_notes(.Last.tune.result)` for more
@@ -832,6 +832,9 @@ There were issues with some computations   A: x10   B: x10</code></pre>
 </div>
 <div id="model-construction-and-interpretation" class="section level1">
 <h1>Model Construction and Interpretation</h1>
+<p>In the following code, we will be using two training models: nearest
+neighbor and decision tree.The steps are to make a workflow, evaluate,
+and print the result.</p>
 <pre class="r"><code>#knn workflow
 knn_spec &lt;- nearest_neighbor() %&gt;%
   set_engine(&quot;kknn&quot;) %&gt;%
@@ -1008,9 +1011,42 @@ Preprocessor1_Model1
 </tr>
 </tbody>
 </table>
-<p>The decision tree model has higher accuracy values so we will proceed
-with that model</p>
-<pre class="r"><code>##workflow
+<p>Result Summary: the decision tree model has higher accuracy
+values</p>
+<p>Next, we will be using hyperparameter tuning. Hyperparameter tuning
+allows data scientists to tweak model performance for optimal results.
+This process is an essential part of machine learning, and choosing
+appropriate hyperparameter values is crucial for success.</p>
+<p>We will start off by setting the grid parameter of tune_grid() to a
+number which will create a “space filling” grid containing that number
+of hyperparameter combinations. These are essentially tibbles (data
+frames) of options for each hyperparameter.</p>
+<pre class="r"><code>##grid
+grid_neighbors &lt;- tibble(
+  &quot;neighbors&quot; = c(1, 3, 5, 7, 11, 15, 21, 41)
+  )
+
+grid_depth &lt;- tibble(
+  &quot;tree_depth&quot; = c(2, 3, 4, 5, 8, 10, 12, 15, 20)
+  )</code></pre>
+<p>The next step is to re-create the model workflows, setting the
+relevant hyperparameters to tune(). Then we’ll pipe these workflows into
+tune_grid() and read the results.</p>
+<pre class="r"><code>##knn workflow
+knn_spec &lt;- nearest_neighbor(neighbors = tune()) %&gt;%
+  set_engine(&quot;kknn&quot;) %&gt;%
+  set_mode(&quot;classification&quot;)
+
+knn_rec &lt;- recipe(priceRange ~ numOfBedrooms + numOfBathrooms + lotSizeSqFt, data = train_data) %&gt;%
+  step_impute_median(all_numeric_predictors()) %&gt;%
+  step_unknown(all_nominal_predictors()) %&gt;%
+  step_dummy(all_nominal_predictors())
+
+knn_wf &lt;- workflow() %&gt;%
+  add_model(knn_spec) %&gt;%
+  add_recipe(knn_rec)
+
+##dt workflow
 dt_spec &lt;- decision_tree(tree_depth = tune()) %&gt;%
   set_engine(&quot;rpart&quot;) %&gt;%
   set_mode(&quot;classification&quot;)
@@ -1024,19 +1060,134 @@ dt_wf &lt;- workflow() %&gt;%
   add_model(dt_spec) %&gt;%
   add_recipe(dt_rec)
 
-##grid
-grid_depth &lt;- tibble(
-  &quot;tree_depth&quot; = c(2, 3, 4, 5, 8, 10, 12, 15, 20)
+##hyperparameter tune
+knn_tune_results &lt;- knn_wf %&gt;%
+  tune_grid(
+    grid = grid_neighbors,
+    resamples = train_folds
   )
 
-##hyperparameter tune
 dt_tune_results &lt;- dt_wf %&gt;%
   tune_grid(
     grid = grid_depth,
     resamples = train_folds
-  )
-
-##results
+  )</code></pre>
+<p>Here is the nearest neighbor result:</p>
+<pre class="r"><code>##knn result 
+knn_tune_results %&gt;%
+  collect_metrics() %&gt;%
+  filter(.metric == &quot;accuracy&quot;) %&gt;%
+  select(neighbors, mean, std_err) %&gt;%
+  arrange(-mean) %&gt;%
+  kable() %&gt;%
+  kable_styling(bootstrap_options = c(&quot;hover&quot;, &quot;striped&quot;))</code></pre>
+<table class="table table-hover table-striped" style="margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:right;">
+neighbors
+</th>
+<th style="text-align:right;">
+mean
+</th>
+<th style="text-align:right;">
+std_err
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right;">
+41
+</td>
+<td style="text-align:right;">
+0.3834221
+</td>
+<td style="text-align:right;">
+0.0043512
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+21
+</td>
+<td style="text-align:right;">
+0.3790826
+</td>
+<td style="text-align:right;">
+0.0041646
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+15
+</td>
+<td style="text-align:right;">
+0.3725793
+</td>
+<td style="text-align:right;">
+0.0056439
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+11
+</td>
+<td style="text-align:right;">
+0.3637390
+</td>
+<td style="text-align:right;">
+0.0063099
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+7
+</td>
+<td style="text-align:right;">
+0.3493965
+</td>
+<td style="text-align:right;">
+0.0052700
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+5
+</td>
+<td style="text-align:right;">
+0.3285520
+</td>
+<td style="text-align:right;">
+0.0044438
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+0.2860253
+</td>
+<td style="text-align:right;">
+0.0048173
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+0.2763486
+</td>
+<td style="text-align:right;">
+0.0034777
+</td>
+</tr>
+</tbody>
+</table>
+<p>Here is the decission tree result:</p>
+<pre class="r"><code>##dt results
 dt_tune_results %&gt;%
   collect_metrics() %&gt;%
   filter(.metric == &quot;accuracy&quot;) %&gt;%
@@ -1160,6 +1311,12 @@ std_err
 </tr>
 </tbody>
 </table>
+<p>Result: The optimized nearest neighbor classifier has higher accuracy
+than the decision tree classifier. The accuracy for this model is about
+38% which is slightly higher than the initial nearest neighbor result of
+32%. It also beats decision tree model which has 37% accuracy. This
+proves that hyperparameter tuning can improve model and increase
+accuracy.</p>
 </div>
 
 
