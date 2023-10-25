@@ -122,3 +122,98 @@ log_reg_cv_results <- log_reg_wf %>%
 #log_reg_fit %>%
   #augment(new_data)
 ```
+
+
+# Model Construction and Interpretation
+```{r}
+#knn workflow
+knn_spec <- nearest_neighbor() %>%
+  set_engine("kknn") %>%
+  set_mode("classification")
+
+knn_rec <- recipe(priceRange ~ numOfBedrooms + numOfBathrooms + lotSizeSqFt, data = train_data) %>%
+  step_impute_median(all_numeric_predictors()) %>%
+  step_unknown(all_nominal_predictors()) %>%
+  step_dummy(all_nominal_predictors())
+
+knn_wf <- workflow() %>%
+  add_model(knn_spec) %>%
+  add_recipe(knn_rec)
+
+#decision tree workflow
+dt_spec <- decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+dt_rec <- recipe(priceRange ~ numOfBedrooms + numOfBathrooms + lotSizeSqFt, data = train_data) %>%
+  step_impute_median(all_numeric_predictors()) %>%
+  step_unknown(all_nominal_predictors()) %>%
+  step_dummy(all_nominal_predictors())
+
+dt_wf <- workflow() %>%
+  add_model(dt_spec) %>%
+  add_recipe(dt_rec)
+
+#evaluate workflows
+knn_cv_results <- knn_wf %>%
+  fit_resamples(train_folds)
+
+dt_cv_results <- dt_wf %>%
+  fit_resamples(train_folds)
+```
+
+```{r}
+#knn result
+knn_cv_results %>%
+  collect_metrics() %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("hover", "striped"))
+```
+
+
+```{r}
+#dt result
+dt_cv_results %>%
+  collect_metrics() %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("hover", "striped"))
+```
+The decision tree model has higher accuracy values so we will proceed with that model
+
+```{r}
+##workflow
+dt_spec <- decision_tree(tree_depth = tune()) %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+dt_rec <- recipe(priceRange ~ numOfBedrooms + numOfBathrooms + lotSizeSqFt, data = train_data) %>%
+  step_impute_median(all_numeric_predictors()) %>%
+  step_unknown(all_nominal_predictors()) %>%
+  step_dummy(all_nominal_predictors())
+
+dt_wf <- workflow() %>%
+  add_model(dt_spec) %>%
+  add_recipe(dt_rec)
+
+##grid
+grid_depth <- tibble(
+  "tree_depth" = c(2, 3, 4, 5, 8, 10, 12, 15, 20)
+  )
+
+##hyperparameter tune
+dt_tune_results <- dt_wf %>%
+  tune_grid(
+    grid = grid_depth,
+    resamples = train_folds
+  )
+
+##results
+dt_tune_results %>%
+  collect_metrics() %>%
+  filter(.metric == "accuracy") %>%
+  select(tree_depth, mean, std_err) %>%
+  arrange(-mean) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("hover", "striped"))
+```
+
