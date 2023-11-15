@@ -1,0 +1,26 @@
+---
+title: "DeepLearning"
+author: "Florence Lourdes"
+date: "2023-11-07"
+output: html_document
+---
+
+```{r}
+#install.packages("tensorflow")
+library(reticulate)
+```
+
+```{python}
+import sys
+sys.executable
+```
+
+```{r}
+path_to_python <- "C:\\Users\\flore\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\\python.exe"
+
+virtualenv_create("r-reticulate", python = path_to_python)
+
+install.packages("keras")
+library(keras)
+install_keras(method = "virtualenv", envname = "r-reticulate", version = "cpu")
+```
