@@ -16,7 +16,11 @@ knitr::opts_chunk$set(echo = TRUE)
 #install.packages("ranger")
 #install.packages("yardstick")
 #install.packages("tidytext")
-library("yardstick")
+#install.packages("ggplot2")
+#install.packages(c("tm", "slam"))
+library(yardstick)
+library(dplyr)
+library(ggplot2)
 library(corrr)
 library(tidyverse)
 library(tidymodels)
@@ -25,12 +29,8 @@ library(patchwork)
 library(ggplot2)
 library(ranger)
 library(tidytext)
-#install.packages('xgboost')
-#require(xgboost)
-#data(agaricus.train, package='xgboost')
-#data(agaricus.test, package='xgboost')
-#train <- agaricus.train
-#test <- agaricus.test
+library(tm)
+library(slam)
 data <- read_csv("C:/MAT434/data.csv")
 comp <- read_csv("C:/MAT434/comp.csv")
 ```
@@ -69,6 +69,7 @@ train_folds <- vfold_cv(train_data, v = 10)
 
 # Exploratory Data Analysis (EDA)
 EDA is an analysis approach that identifies general patterns in the data. These patterns include outliers and features of the data that might be unexpected. EDA is an important first step in any data analysis.
+
 ```{r}
 # Summary statistics
 summary(train_data)
@@ -87,47 +88,67 @@ data_cor <- train_data %>%
   correlate()
 ```
 
-# Training a Model
+The next chunk of code utilizes text based extraction to determine the top 20 words most commonly found in the description.
 
 ```{r}
-# Create a model specification
-log_reg_spec <- logistic_reg() %>%
-  set_engine("glm") %>%
-  set_mode("classification")
+# Tokenize the description feature
+data_text <- data %>%
+  select(id, description, priceRange) %>%
+  unnest_tokens(word, description) %>%
+  anti_join(stop_words)
 
-# Create a recipe
-log_reg_rec <- recipe(priceRange ~ ., data = train_data) %>%
-  step_rm(id, description, latitude, longitude, avgSchoolRating, MedianStudentsPerTeacher) %>%
-  step_impute_median(all_numeric_predictors()) %>%
-  step_impute_mode(all_nominal_predictors()) %>%
-  step_dummy(all_nominal_predictors()) #add recipe steps as needed
 
-# Create a workflow
-log_reg_wf <- workflow() %>%
-  add_model(log_reg_spec) %>%
-  add_recipe(log_reg_rec)
+# Count word frequencies
+word_freq <- data_text %>%
+  count(word, sort = TRUE)
 
-# Run cross-validation to obtain cross-validation performance estimate
-log_reg_cv_results <- log_reg_wf %>%
-  fit_resamples(train_folds)
+# Visualize top words
+top_words_plot <- word_freq %>%
+  top_n(20) %>%
+  ggplot(aes(x = reorder(word, n), y = n, fill = word)) +
+  geom_col(show.legend = FALSE) +
+  labs(title = "Top 20 Words in Descriptions", x = "Word", y = "Frequency") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-# Collect cross-validation results
-#log_reg_cv_results %>%
-  #collect_metrics()
-
-# Fit model to training data
-#log_reg_fit <- log_reg_wf %>%
-  #fit(train_data)
-
-# Assess model on test data
-#log_reg_wf %>%
-  #augment(test) %>%
-  #my_metrics(response, .pred)
-
-# Use model to predict for new data
-#log_reg_fit %>%
-  #augment(new_data)
+# Print the plot
+print(top_words_plot)
 ```
+
+Now let's dive deeper into text based extraction. We will be filtering out some of the commonly found words and group the resulting words' frequency based on price range. 
+
+```{r}
+# Assuming this is part of your existing code
+train_data_text <- training(split_data)
+
+# Tokenize the text and remove stop words
+word_tokens <- train_data_text %>%
+  unnest_tokens(word, description) %>%
+  anti_join(stop_words) %>%
+  filter(!(word %in% c("home", "bedrooms", "bedroom", "bathrooms", "kitchen", "family", "living", "master", "single", "backyard", "austin", "tx", "ft", "built", "bath", "sq", "dining"))) %>%
+  filter(!str_detect(word, "\\d+"))
+
+# Count word frequencies
+word_freq <- word_tokens %>%
+  group_by(priceRange) %>%
+  count(word) %>%
+  top_n(15) %>%
+  ungroup() %>%
+  mutate(priceRange = as.factor(priceRange),
+         word = reorder_within(word, n, priceRange))
+
+# Create the plot
+top_words_plot <- word_freq %>%
+  ggplot() +
+  geom_col(aes(x = word, y = n, fill = priceRange), show.legend = FALSE) + 
+  scale_x_reordered() +
+  coord_flip() +
+  facet_wrap(~priceRange, scales = "free")
+
+# Print the plot
+print(top_words_plot)
+
+```
+We found new words that are considered important when it comes to a house. For example: "private", "pool", "spacious" and "garage" are some of the keywords customers might be looking for in a house. You can see that "pool" is more commonly found in houses with $450,000 or above price range. This shows how text based extraction can be beneficial in looking for information that are otherwise not specified in an individual column type. 
 
 # Model Construction and Interpretation
 In the following code, we will be using two training models: nearest neighbor and decision tree.The steps are to make a workflow, evaluate, and print the result.
@@ -169,20 +190,17 @@ dt_cv_results <- dt_wf %>%
   fit_resamples(train_folds)
 ```
 
+ Here is the KNN result
 ```{r}
 # KNN result
 knn_cv_results %>%
-  collect_metrics() %>%
-  kable() %>%
-  kable_styling(bootstrap_options = c("hover", "striped"))
+  collect_metrics()
 ```
-
+Here is the decision tree result
 ```{r}
 # DT result
 dt_cv_results %>%
-  collect_metrics() %>%
-  kable() %>%
-  kable_styling(bootstrap_options = c("hover", "striped"))
+  collect_metrics()
 ```
 
 
@@ -193,7 +211,6 @@ Next, we will be using hyperparameter tuning. Hyperparameter tuning allows data 
 We will start off by setting the grid parameter of tune_grid() to a number which will create a “space filling” grid containing that number of hyperparameter combinations. These are essentially tibbles (data frames) of options for each hyperparameter.
 
 ```{r}
-
 # Grid
 grid_neighbors <- tibble(
   "neighbors" = c(1, 3, 5, 7, 11, 15, 21, 41)
@@ -212,7 +229,7 @@ knn_spec <- nearest_neighbor(neighbors = tune()) %>%
   set_engine("kknn") %>%
   set_mode("classification")
 
-knn_rec <- recipe(priceRange ~ numOfBedrooms + numOfBathrooms + lotSizeSqFt, data = train_data) %>%
+knn_rec <- recipe(priceRange ~ numOfBedrooms + numOfBathrooms + lotSizeSqFt , data = train_data) %>%
   step_impute_median(all_numeric_predictors()) %>%
   step_unknown(all_nominal_predictors()) %>%
   step_dummy(all_nominal_predictors())
@@ -250,16 +267,14 @@ dt_tune_results <- dt_wf %>%
 
 ```
 
-Here is the nearest neighbor result:
+Here is the tuned nearest neighbor result:
 ```{r}
 # KNN result 
 knn_tune_results %>%
   collect_metrics() %>%
   filter(.metric == "accuracy") %>%
   select(neighbors, mean, std_err) %>%
-  arrange(-mean) %>%
-  kable() %>%
-  kable_styling(bootstrap_options = c("hover", "striped"))
+  arrange(-mean)
 ```
 
 Here is the decission tree result:
@@ -269,13 +284,12 @@ dt_tune_results %>%
   collect_metrics() %>%
   filter(.metric == "accuracy") %>%
   select(tree_depth, mean, std_err) %>%
-  arrange(-mean) %>%
-  kable() %>%
-  kable_styling(bootstrap_options = c("hover", "striped"))
+  arrange(-mean)
 ```
 
 
-Result: The optimized nearest neighbor classifier has higher accuracy than the decision tree classifier. The accuracy for this model is about 38% which is slightly higher than the initial nearest neighbor result of 32%. It also beats decision tree model which has 37% accuracy. This proves that hyperparameter tuning can improve model and increase accuracy.
+Result: The optimized nearest neighbor classifier has higher accuracy than the decision tree classifier. The accuracy for this model is about 38% which is higher than the initial nearest neighbor result of 31%. It also beats decision tree model which has 37% accuracy. This proves that hyperparameter tuning can improve model and increase accuracy.
+
 
 After deciding on a model with the highest accuracy result, we will be fitting the model to do predictions on the competition data set. The predictions will then be exported as a csv file for submission.
 
@@ -320,7 +334,7 @@ write.csv(submission_df, "ZillowSubmission.csv", row.names = FALSE)
 The next step is to explore another model to hopefully get a higher accuracy. The model that we are going to use now is random forest. A random forest is a form of bootstrap aggregation where we construct a decision tree model on each of the bootstrapped training sets. Rather than just constructing a decision tree though, we allow each tree access to only a random subset of predictors each time it makes a split. Since the trees are provided random access to the predictors, our trees won't all look alike. This means that the decision trees in our random forest ensemble won't make the same errors and the ensemble can benefit from the wisdom of the crowd.
 
 
-```{r eval = FALSE, echo = FALSE, include = FALSE}
+```{r}
 # Define random forest
 rf_spec <- rand_forest() %>%
   set_engine("ranger", importance = "impurity") %>%
@@ -352,9 +366,7 @@ rf_cv_results <- rf_wf %>%
 ```{r}
 # Random Forest result
 rf_cv_results %>%
-  collect_metrics() %>%
-  kable() %>%
-  kable_styling(bootstrap_options = c("hover", "striped"))
+  collect_metrics()
 ```
 We get 40.3% as the accuracy result. It is a slight improvement of the tuned KNN model that had 38% accuracy. The next step is to do hyperparameter tuning like we did with the Nearest Neighbor and Decision Tree models to hopefully get a model with better accuracy. We are going to use Bootstrap. Bootstrapping is a widely used technique to generate new, hypothetical random samples. We treat our available sample data as if it were the population, and repeatedly draw random samples from it. These random samples have the same size as the original set of sample data and are drawn with replacement.
 
@@ -384,7 +396,7 @@ rf_tune_results <- rf_wf %>%
 # Print the results of hyperparameter tuning
 collect_metrics(rf_tune_results)
 ```
-Unfortunately, none of the grids produced an accuracy higher than the untuned random forest. The hyperparameter grid used in the tuning process may not include values that improve the model's performance. It's essential to carefully choose the range and values for hyperparameters. Expanding the search space or consider different values for mtry and trees may give a higher accuracy value. For now, let's fit the untuned random forest model. 
+Unfortunately, none of the grids produced an accuracy higher than the untuned random forest. The hyperparameter grid used in the tuning process may not include values that improve the model's performance. It's essential to carefully choose the range and values for hyperparameters. Expanding the search space or consider different values for mtry and trees may give a higher accuracy value but the downside is it can take a very long time to run. For now, let's fit the untuned random forest model. 
 
 ```{r}
 # Extract the best model
