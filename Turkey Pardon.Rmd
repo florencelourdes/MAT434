@@ -1,0 +1,188 @@
+---
+title: "Turkey Pardon"
+output: html_notebook
+---
+
+```{r}
+library(rpart.plot)
+library(rpart)
+library(tidyverse)
+library(tidymodels)
+library(caret)
+library(kknn) # For K-nearest neighbors
+
+turkey_train <- read_csv("C:/MAT434/MAT434 R Studio/turkeys_train.csv")
+turkey_test <- read_csv("C:/MAT434/MAT434 R Studio/turkeys_comp.csv")
+
+```
+
+```{r}
+set.seed(456)
+train_folds <- vfold_cv(turkey_train, v = 10)
+```
+
+```{r}
+#decision tree workflow
+dt_spec <- decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+dt_rec <- recipe(pardoned ~ dsb, data = turkey_train) %>%
+  step_impute_median(all_numeric_predictors()) %>%
+  step_unknown(all_nominal_predictors()) %>%
+  step_dummy(all_nominal_predictors())
+
+dt_wf <- workflow() %>%
+  add_model(dt_spec) %>%
+  add_recipe(dt_rec)
+
+my_metrics <- metric_set(mn_log_loss)
+
+#evaluate workflows
+dt_cv_results <- dt_wf %>%
+  fit_resamples(resamples = train_folds, metrics = my_metrics)
+```
+
+```{r}
+#dt result
+dt_cv_results %>%
+  collect_metrics() %>%
+```
+
+```{r}
+# Grid
+grid_depth <- tibble(
+  "tree_depth" = c(2, 3, 4, 5, 8, 10, 12, 15, 20)
+  )
+```
+
+```{r}
+##dt workflow
+dt_spec <- decision_tree(tree_depth = tune()) %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+dt_rec <- recipe(pardoned ~ dsb, data = turkey_train) %>%
+  step_impute_median(all_numeric_predictors()) %>%
+  step_unknown(all_nominal_predictors()) %>%
+  step_dummy(all_nominal_predictors())
+
+dt_wf <- workflow() %>%
+  add_model(dt_spec) %>%
+  add_recipe(dt_rec)
+
+my_metrics <- metric_set(mn_log_loss)
+
+##hyperparameter tune
+dt_tune_results <- dt_wf %>%
+  tune_grid(
+    grid = grid_depth,
+    resamples = train_folds, metrics = my_metrics
+  )
+```
+
+
+Here is the decission tree result:
+```{r}
+##dt results
+dt_tune_results %>%
+  collect_metrics() %>%
+  select(tree_depth, mean, std_err) %>%
+  arrange(-mean) %>%
+```
+
+Random Forest
+```{r}
+# Define random forest
+rf_spec <- rand_forest() %>%
+  set_engine("ranger", importance = "impurity") %>%
+  set_mode("classification")
+
+#Set recipe
+rf_rec <- recipe(pardoned ~ dsb, data = turkey_train) %>%
+  step_impute_knn(all_predictors()) %>%
+  step_dummy(all_nominal_predictors())
+
+# Create workflow
+rf_wf <- workflow() %>%
+  add_model(rf_spec) %>%
+  add_recipe(rf_rec)
+
+# Fit model
+rf_fit <- rf_wf %>%
+  fit(turkey_train)
+
+rf_fit %>%
+  extract_fit_engine() %>%
+  ranger::treeInfo(tree = 1)
+
+my_metrics <- metric_set(mn_log_loss)
+
+# Evaluate workflows
+rf_cv_results <- rf_wf %>%
+  fit_resamples(train_folds, metrics = my_metrics)
+```
+
+```{r}
+# Random Forest result
+rf_cv_results %>%
+  collect_metrics() 
+```
+
+
+```{r}
+# Specify the random forest model with hyperparameter grid
+rf_spec <- rand_forest(trees = tune(), mtry = tune()) %>%
+  set_engine("ranger", importance = "impurity") %>%
+  set_mode("classification")
+
+# Set recipe
+rf_rec <- recipe(pardoned ~ ., data = turkey_train) %>%
+  step_impute_knn(all_predictors()) %>%
+  step_dummy(all_nominal_predictors())
+
+# Create the workflow with the model specification and recipe
+rf_wf <- workflow() %>%
+  add_model(rf_spec) %>%
+  add_recipe(rf_rec)
+
+my_metrics <- metric_set(mn_log_loss)
+
+# Perform hyperparameter tuning
+rf_tune_results <- rf_wf %>%
+  tune_grid(
+    resamples = rsample::bootstraps(turkey_train, times = 5), metrics = my_metrics,
+    grid = expand.grid(trees = c(50, 100, 150, 200, 300, 400, 500), mtry = c(2, 4, 6, 8))
+  )
+
+# Print the results of hyperparameter tuning
+collect_metrics(rf_tune_results)
+```
+
+
+```{r}
+# Extract the best model
+rf_spec <- rand_forest() %>%
+  set_engine("ranger", importance = "impurity") %>%
+  set_mode("classification")
+
+rf_rec <- recipe(pardoned ~ dsb, data = turkey_train) %>%
+  step_impute_knn(all_predictors()) %>%
+  step_dummy(all_nominal_predictors())
+
+# Create workflow
+rf_wf <- workflow() %>%
+  add_model(rf_spec) %>%
+  add_recipe(rf_rec)
+
+# Fit model
+rf_fit <- rf_wf %>%
+  fit(data)
+
+# Enter competition data
+rf_fit %>%
+  augment(turkey_test)
+
+# Export
+write.csv(submission_df, "TurkeySubmission.csv", row.names = FALSE)
+```
