@@ -1,0 +1,241 @@
+---
+title: "Adoptable Pets Outcome Prediction"
+author: "Florence Lourdes"
+date: "2023-12-05"
+output: html_document
+---
+
+```{r}
+library(yardstick)
+library(dplyr)
+library(ggplot2)
+library(corrr)
+library(tidyverse)
+library(tidymodels)
+library(kableExtra)
+library(patchwork)
+library(ggplot2)
+library(ranger)
+library(tidytext)
+library(tm)
+library(slam)
+data <- read_csv("C:/MAT434/MAT434 R Studio/aac_shelter_outcomes.csv")
+```
+
+# Statement of Purpose
+The purpose of this project is to develop a predictive model that can assess the likelihood of an animal being adopted based on various features available in the Austin Animal Center Shelter dataset. By leveraging data science and machine learning techniques, my aim is to provide insights that can aid shelter staff in making informed decisions, ultimately increasing the adoption rates and improving the overall welfare of animals in the shelter.
+
+# Introduction
+Animal shelters play a crucial role in providing temporary care for animals in need. One of the challenges faced by these shelters is predicting which animals are more likely to be adopted, allowing them to allocate resources efficiently. In this project, we will utilize data science and machine learning methodologies to analyze the Austin Animal Center Shelter dataset. By understanding patterns in the data, I aim to create a predictive model that can assist shelter staff in identifying animals with higher chances of adoption, ultimately contributing to the well-being of these animals.
+
+# Head of Data
+The following table shows the top 6 rows of the data
+```{r}
+data %>%
+  head()
+```
+
+# Check for missing values
+```{r}
+colSums(is.na(data))
+```
+
+# Filter Data
+Since we are going to predict outcome_subtype, we need to get rid of data inputs that do not have a value for outcome_subtype 
+```{r}
+data <- data %>%
+  filter(!is.na(outcome_subtype))
+```
+
+# Split data into training and test sets
+The following code chunk is to set a seed to make sure that we get the same results for randomizationsplits. It also splits data into a training and test sets with a 8 to 2 ratio and marking outcome_type as prediction target. The last part is to extract the data from each training and test sets.
+```{r}
+set.seed(434)
+
+my_data_split <- initial_split(data, prop = 0.8, strata = outcome_type)
+
+train <- training(my_data_split)
+test <- testing(my_data_split)
+```
+
+# Build cross-validation folds
+K-fold cross-validation is a technique for evaluating predictive models. The dataset is divided into k subsets or folds. The model is trained and evaluated k times, using a different fold as the validation set each time. Performance metrics from each fold are averaged to estimate the model's generalization performance.
+```{r}
+set.seed(456)
+train_folds <- vfold_cv(train, v = 10)
+```
+
+
+#Exploratory Data Analysis
+EDA is an analysis approach that identifies general patterns in the data. These patterns include outliers and features of the data that might be unexpected. EDA is an important first step in any data analysis.
+```{r}
+adoption_data <- train[train$outcome_type == "Adoption", ]
+
+# Box plot for adopted animals by age 
+ggplot(adoption_data, aes(x = age_upon_outcome)) +
+  geom_bar(fill = "skyblue", color = "black") +
+  labs(title = "Count of Adoptions Based on Age",
+       x = "Age Upon Outcome (in years)",
+       y = "Count") + 
+  coord_flip()
+
+# Bar plot for top 10 adopted breeds by count
+top_breeds <- adoption_data %>%
+  group_by(breed) %>%
+  summarize(count = n()) %>%
+  arrange(desc(count)) %>%
+  head(10)
+
+ggplot(top_breeds, aes(x = reorder(breed, -count), y = count)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(title = "Top 10 Adopted Breeds by Count",
+       x = "Breed",
+       y = "Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Bar plot for adoption outcomes based on animal type
+ggplot(train, aes(x = animal_type, fill = outcome_type)) +
+  geom_bar(position = "stack") +
+  labs(title = "Adoption Outcomes Based on Animal Type",
+       x = "Animal Type",
+       y = "Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Target Variable Analysis
+# A bar plot for the distribution of adoption outcomes
+ggplot(train, aes(x = outcome_type, fill = outcome_type)) +
+  geom_bar() +
+  labs(title = "Distribution of Adoption Outcomes",
+       x = "Outcome Type",
+       y = "Count")
+```
+
+# Model Construction and Interpretation
+In the following code, we will be using a training models called decision tree.The steps are to make a workflow, evaluate, and print the result.
+
+```{r}
+# Decision tree workflow
+dt_spec <- decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+dt_rec <- recipe(outcome_type ~ age_upon_outcome, data = train) %>%
+  step_impute_median(all_numeric_predictors()) %>%
+  step_novel(all_nominal_predictors()) %>%
+  step_unknown(all_nominal_predictors()) %>%
+  step_dummy(all_nominal_predictors())
+
+dt_wf <- workflow() %>%
+  add_model(dt_spec) %>%
+  add_recipe(dt_rec)
+
+# Evaluate workflows
+dt_cv_results <- dt_wf %>%
+  fit_resamples(train_folds)
+```
+
+Here is the decision tree result
+```{r}
+# DT result
+dt_cv_results %>%
+  collect_metrics()
+```
+
+
+Next, we will be using hyperparameter tuning. Hyperparameter tuning allows data scientists to tweak model performance for optimal results. This process is an essential part of machine learning, and choosing appropriate hyperparameter values is crucial for success.
+
+We will start off by setting the grid parameter of tune_grid() to a number which will create a “space filling” grid containing that number of hyperparameter combinations. These are essentially tibbles (data frames) of options for each hyperparameter.
+
+```{r}
+# Grid
+grid_depth <- tibble(
+  "tree_depth" = c(2, 3, 4, 5, 8, 10, 12, 15, 20)
+  )
+```
+
+The next step is to re-create the model workflows, setting the relevant hyperparameters to tune(). Then we’ll pipe these workflows into tune_grid() and read the results.
+```{r}
+# DT workflow
+dt_spec <- decision_tree(tree_depth = tune()) %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+dt_rec <- recipe(outcome_type ~ age_upon_outcome, data = train) %>%
+  step_impute_median(all_numeric_predictors()) %>%
+  step_novel(all_nominal_predictors()) %>%
+  step_unknown(all_nominal_predictors()) %>%
+  step_dummy(all_nominal_predictors())
+
+dt_wf <- workflow() %>%
+  add_model(dt_spec) %>%
+  add_recipe(dt_rec)
+
+# Hyperparameter tune
+dt_tune_results <- dt_wf %>%
+  tune_grid(
+    grid = grid_depth,
+    resamples = train_folds
+  )
+
+```
+
+Here is the tuned decission tree result:
+```{r}
+# DT results
+dt_tune_results %>%
+  collect_metrics() %>%
+  filter(.metric == "accuracy") %>%
+  select(tree_depth, mean, std_err) %>%
+  arrange(-mean)
+```
+Result: The optimized decision tree model have the same accuracy as the normal decision tree classifier.
+
+The final step is to fit, assess, and utilize our best model. Since the untuned decision tree classifier has the same accuracy as the tuned decision tree classifier, we will fit the untuned decision tree classifier because it is a simpler model.
+```{r}
+# Decision tree workflow
+dt_spec <- decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+dt_rec <- recipe(outcome_type ~ age_upon_outcome, data = train) %>%
+  step_impute_median(all_numeric_predictors()) %>%
+  step_novel(all_nominal_predictors()) %>%
+  step_unknown(all_nominal_predictors()) %>%
+  step_dummy(all_nominal_predictors())
+
+dt_wf <- workflow() %>%
+  add_model(dt_spec) %>%
+  add_recipe(dt_rec)
+
+# Fit model
+dt_fit <- dt_wf %>%
+  fit(train)
+
+# Enter test data
+dt_fit %>%
+  augment(test) %>%
+  mutate(outcome_type = as.factor(outcome_type)) %>%
+  accuracy(outcome_type, .pred_class)
+```
+# Executive Summary
+This project aimed to predict animal adoption outcomes using a basic decision tree model, focusing on a single variable for simplicity. The dataset, sourced from the Austin Animal Center Shelter, contained information about various factors influencing animal outcomes. The model achieved a 66% accuracy rate in its predictions.
+
+The decision to use a basic decision tree with a single variable was deliberate, serving as an initial exploration into the predictive capabilities of the chosen feature. This simplicity allowed for a clear understanding of the model's performance and potential areas for improvement.
+
+Key Findings and Insights:
+
+- Model Accuracy: The decision tree model achieved a 66% accuracy rate in predicting adoption outcomes. While this accuracy level provides a baseline understanding of the model's performance, it is essential to acknowledge its limitations, especially when considering the complexity of real-world animal adoption scenarios.
+
+- Single Variable Focus: The decision to train the model using only one variable was intentional and served as a starting point for the analysis. This decision allowed for a focused examination of the predictive power of a specific feature. Further iterations of the model could explore the incorporation of additional variables for a more comprehensive analysis.
+
+- Model Complexity: The basic decision tree model was implemented without hyperparameter tuning, emphasizing simplicity for initial exploration. This decision provides a clear baseline for future enhancements and optimizations, with opportunities to fine-tune the model's parameters for improved predictive performance.
+
+# Conclusions
+In conclusion, the project successfully implemented a basic decision tree model to predict animal adoption outcomes using a single variable. The 66% accuracy achieved provides valuable insights into the model's potential, but it is important to note that this represents an initial exploration. Future iterations could benefit from incorporating more features, exploring alternative algorithms, and conducting deeper hyperparameter tuning to enhance predictive accuracy.
+
+The decision to focus on simplicity in this phase of the project was strategic, allowing for a foundational understanding of the predictive power of individual variables. This project lays the groundwork for future enhancements and serves as a stepping stone for more advanced analyses and model optimizations.
+
+Moving forward, the exploration of additional features, algorithmic improvements, and rigorous hyperparameter tuning will be crucial in developing a more robust and accurate model for predicting animal adoption outcomes at the Austin Animal Center Shelter.
+
+# References
+https://agmath.github.io/ClassificationCourse.html
